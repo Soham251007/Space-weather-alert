@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HELIOGUARD · Space Weather Impact Alert System</title>
+  <meta name="description" content="3D planetary space weather impact monitoring system for geomagnetic storms, power grid failures, communications degradation, and satellite/aviation anomalies.">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  
+  <!-- Modern Clean Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='10' fill='%230284c7'/><circle cx='12' cy='12' r='4' fill='white'/></svg>">
+  <link rel="stylesheet" href="css/style.css?v=3.2">
+
+  <!-- Open Source 3D Engine (Local Vendor Copies) -->
+  <script src="vendor/three.min.js"></script>
+  <script src="vendor/OrbitControls.js"></script>
+</head>
+<body>
+
+  <!-- ==========================================
+       3D INTERACTIVE GLOBE VIEWPORT (Large & Centered)
+       ========================================== -->
+  <div id="globe-canvas-container"></div>
+  
+  <!-- Floating 3D Hover Tooltip -->
+  <div id="globe-tooltip" class="globe-tooltip-pill">
+    <div class="tooltip-header">
+      <span id="tooltip-icon">⚡</span>
+      <span id="tooltip-title">Infrastructure Node</span>
+    </div>
+    <div id="tooltip-sub" class="tooltip-sub">Vulnerability Diagnostic</div>
+  </div>
+
+  <!-- ==========================================
+       FLOATING TOP HEADER HUD
+       ========================================== -->
+  <header class="header-bar glass-panel">
+    <div class="brand-section">
+      <div class="brand-logo-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="4"/>
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-title-row">
+          <span class="brand-title">HELIOGUARD</span>
+          <span id="threat-status-badge" class="live-pulse-badge status-nominal">
+            <span class="pulse-dot"></span>
+            <span id="threat-status-text">NOMINAL / QUIET</span>
+          </span>
+        </div>
+        <p class="brand-subtitle">Planetary Space Weather Defense Grid</p>
+      </div>
+    </div>
+
+    <!-- Live Telemetry Strip with Mouse Scroller Controls & Drag Support -->
+    <div class="telemetry-scroller-container">
+      <button id="btn-scroll-telemetry-left" class="telemetry-scroll-arrow-btn" title="Scroll telemetry left with mouse" aria-label="Scroll left">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+
+      <div class="telemetry-mouse-scroller-badge" id="telemetry-mouse-scroller-icon" title="Mouse Scroller: Roll mouse wheel, drag, or click to scroll telemetry">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <rect x="5" y="2" width="14" height="20" rx="7"/>
+          <line x1="12" y1="6" x2="12" y2="10"/>
+        </svg>
+        <span class="scroller-icon-arrows">◄►</span>
+      </div>
+
+      <div id="telemetry-strip" class="telemetry-strip" title="Scroll with mouse wheel, drag horizontally, or use scrollbar">
+        <!-- 1. Kp Index -->
+        <div class="telemetry-pill">
+          <span class="telemetry-label">Kp Index</span>
+          <span id="val-kp" class="telemetry-val">--</span>
+          <span id="badge-g-scale" class="telemetry-sub status-nominal">G0</span>
+        </div>
+
+        <!-- 2. Solar Wind Speed -->
+        <div class="telemetry-pill">
+          <span class="telemetry-label">Solar Wind</span>
+          <span id="val-wind-speed" class="telemetry-val">-- km/s</span>
+        </div>
+
+        <!-- 3. IMF Bz Magnetic Field -->
+        <div class="telemetry-pill">
+          <span class="telemetry-label">IMF Bz</span>
+          <span id="val-bz" class="telemetry-val">-- nT</span>
+        </div>
+
+        <!-- 4. Active Alerts (Clickable) -->
+        <div class="telemetry-pill clickable" id="pill-active-alerts" title="Click to view all active alerts in feed">
+          <span class="telemetry-label">Active Alerts</span>
+          <span id="val-alert-count" class="telemetry-val">21 Active</span>
+        </div>
+
+        <!-- 5. Radio HF Blackout Scale (R) -->
+        <div class="telemetry-pill">
+          <span class="telemetry-label">Radio HF</span>
+          <span id="val-r-scale" class="telemetry-val">R0</span>
+          <span id="badge-r-scale" class="telemetry-sub status-nominal">Quiet</span>
+        </div>
+
+        <!-- 6. Solar Radiation Storm Scale (S) -->
+        <div class="telemetry-pill">
+          <span class="telemetry-label">Radiation</span>
+          <span id="val-s-scale" class="telemetry-val">S0</span>
+          <span id="badge-s-scale" class="telemetry-sub status-nominal">Normal</span>
+        </div>
+
+        <!-- 7. Auroral Oval Reach -->
+        <div class="telemetry-pill">
+          <span class="telemetry-label">Aurora Reach</span>
+          <span id="val-aurora-top" class="telemetry-val">66° N</span>
+        </div>
+
+        <!-- 8. Solar Cycle 25 Phase -->
+        <div class="telemetry-pill">
+          <span class="telemetry-label">Solar Cycle 25</span>
+          <span class="telemetry-val" style="color: #0284c7;">Solar Max</span>
+        </div>
+      </div>
+
+      <button id="btn-scroll-telemetry-right" class="telemetry-scroll-arrow-btn" title="Scroll telemetry right with mouse" aria-label="Scroll right">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+
+    <!-- Action Controls -->
+    <div class="header-actions">
+      <select id="scenario-select" class="scenario-select" title="Switch between real-time data and historical simulation scenarios">
+        <!-- Injected by JS -->
+      </select>
+
+      <button id="btn-notifications-toggle" class="header-action-pill" title="Configure Mobile Push Alerts via ntfy.sh">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <span>Phone Alerts</span>
+        <span id="ntfy-header-status" class="ntfy-header-badge">ntfy.sh</span>
+      </button>
+
+      <button id="btn-sound-toggle" class="icon-btn active" title="Toggle Aerospace Chimes">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        </svg>
+      </button>
+
+      <button id="btn-rotate-toggle" class="icon-btn active" title="Toggle Auto-Rotation">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ==========================================
+       BOTTOM SLIDE-OUT CONSOLE (DOCK & DRAWER)
+       ========================================== -->
+  <div id="bottom-console" class="bottom-console-container">
+
+    <!-- 1. SLIDE-UP DRAWER TRAY (Opens upwards) -->
+    <div id="bottom-drawer" class="bottom-drawer glass-panel open">
+      
+      <!-- Drawer Header Bar -->
+      <div class="drawer-header">
+        <div class="drawer-header-left">
+          <h2 id="drawer-active-title" class="drawer-title">
+            <span id="drawer-title-icon">⚡</span>
+            <span id="drawer-title-text">Sector Impact Matrix</span>
+          </h2>
+          <span id="drawer-subtitle" class="drawer-subtitle">Real-time planetary infrastructure vulnerability</span>
+        </div>
+        <div class="drawer-header-right">
+          <button id="btn-drawer-close" class="drawer-close-btn" title="Minimize Drawer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Drawer Body Content Panes -->
+      <div class="drawer-content">
+
+        <!-- PANE 1: SECTOR IMPACTS -->
+        <div id="pane-impacts" class="tab-pane active">
+          <!-- Filter pills row -->
+          <div class="drawer-filter-row">
+            <div class="filter-pill-group">
+              <button class="filter-pill active" data-category="all">
+                <span>🌐</span> All Sectors
+              </button>
+              <button class="filter-pill" data-category="power_grid">
+                <span>⚡</span> Power Grids
+              </button>
+              <button class="filter-pill" data-category="communication_navigation">
+                <span>📡</span> Comms & GPS
+              </button>
+              <button class="filter-pill" data-category="satellite_aviation">
+                <span>🛰️</span> Sat & Aero
+              </button>
+            </div>
+            <div class="aurora-quick-tag">
+              <span>🌌 Auroral Oval Reach:</span>
+              <strong id="aurora-extent-lat">66° N Latitude</strong>
+            </div>
+          </div>
+
+          <!-- 4 Impact Cards Grid -->
+          <div class="impact-cards-grid">
+            <!-- 1. Power Grids -->
+            <div class="impact-card card-power">
+              <div class="impact-card-top">
+                <div class="impact-name">
+                  <span>⚡</span> Bulk Power Grids (GIC)
+                </div>
+                <span id="badge-power-status" class="impact-badge status-nominal">Nominal</span>
+              </div>
+              <div class="impact-meter-bar">
+                <div id="meter-power-fill" class="impact-meter-fill" style="width: 15%; background: var(--color-power);"></div>
+              </div>
+              <div class="impact-details-row">
+                <span>Induced Neutral Current:</span>
+                <span id="meter-power-val" class="impact-value">12 A (DC est)</span>
+              </div>
+              <div class="impact-caption">Risk of half-cycle transformer core saturation</div>
+            </div>
+
+            <!-- 2. Communications & Navigation -->
+            <div class="impact-card card-comms">
+              <div class="impact-card-top">
+                <div class="impact-name">
+                  <span>📡</span> Comms & GNSS Nav
+                </div>
+                <span id="badge-comms-status" class="impact-badge status-nominal">Nominal</span>
+              </div>
+              <div class="impact-meter-bar">
+                <div id="meter-comms-fill" class="impact-meter-fill" style="width: 12%; background: var(--color-comms);"></div>
+              </div>
+              <div class="impact-details-row">
+                <span>Scintillation Index:</span>
+                <span id="meter-comms-val" class="impact-value">S4 0.18</span>
+              </div>
+              <div class="impact-caption">GPS loss-of-lock in equatorial & auroral zones</div>
+            </div>
+
+            <!-- 3. Satellite & Aviation -->
+            <div class="impact-card card-sat">
+              <div class="impact-card-top">
+                <div class="impact-name">
+                  <span>🛰️</span> Satellites & Aviation
+                </div>
+                <span id="badge-sat-status" class="impact-badge status-nominal">Nominal</span>
+              </div>
+              <div class="impact-meter-bar">
+                <div id="meter-sat-fill" class="impact-meter-fill" style="width: 10%; background: var(--color-sat);"></div>
+              </div>
+              <div class="impact-details-row">
+                <span>Polar Route Dose:</span>
+                <span id="meter-sat-val" class="impact-value">1.4 µSv/hr</span>
+              </div>
+              <div class="impact-caption">LEO thermospheric drag & avionics SEU risk</div>
+            </div>
+
+            <!-- 4. Dynamic Auroral Oval -->
+            <div class="impact-card card-aurora">
+              <div class="impact-card-top">
+                <div class="impact-name">
+                  <span>🌌</span> Auroral Oval State
+                </div>
+                <span id="badge-aurora-status" class="impact-badge status-nominal">Polar Bound</span>
+              </div>
+              <div class="impact-meter-bar">
+                <div id="meter-aurora-fill" class="impact-meter-fill" style="width: 20%; background: #10B981;"></div>
+              </div>
+              <div class="impact-details-row">
+                <span>Sub-auroral Boundary:</span>
+                <span id="meter-aurora-val" class="impact-value">Kp 1.7</span>
+              </div>
+              <div class="impact-caption">Dynamic oval visualized in real-time on globe</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANE 2: LIVE ALERTS FEED -->
+        <div id="pane-alerts" class="tab-pane">
+          <div class="alerts-controls-row">
+            <input type="text" id="alert-search-input" class="alert-search-input" placeholder="Search space weather alerts, product codes, or locations...">
+            <button id="btn-quick-phone-alerts" class="alerts-phone-quick-btn" title="Configure and test mobile notifications">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <span>Phone Alerts</span>
+            </button>
+            <span class="alerts-filter-hint">Click any alert to inspect & push to phone</span>
+          </div>
+
+          <div class="alerts-filter-bar">
+            <div class="alerts-category-pills" id="alerts-category-pills">
+              <button class="alert-cat-pill active" data-category="all">All Alerts (<span id="count-pill-all">21</span>)</button>
+              <button class="alert-cat-pill" data-category="power_grid">⚡ Power Grids (<span id="count-pill-power">14</span>)</button>
+              <button class="alert-cat-pill" data-category="communication_navigation">📡 Comms & GNSS (<span id="count-pill-comms">5</span>)</button>
+              <button class="alert-cat-pill" data-category="satellite_aviation">🛰️ Satellites & Aero (<span id="count-pill-sat">2</span>)</button>
+            </div>
+          </div>
+          <div id="alert-stream-list" class="alert-stream-horizontal">
+            <!-- Alert cards injected by JS -->
+          </div>
+        </div>
+
+        <!-- PANE 3: REGIONS & LEGEND -->
+        <div id="pane-regions" class="tab-pane">
+          <div class="regions-pane-content">
+            <div class="region-buttons-box">
+              <h4 class="subhead">Geographic Impact Focus Corridors</h4>
+              <div class="region-btn-group">
+                <button class="region-pill active" data-region="global">🌐 Global View</button>
+                <button class="region-pill" data-region="north-america">🇨🇦 North America (Hydro-Québec / PJM)</button>
+                <button class="region-pill" data-region="scandinavia">🇳🇴 Scandinavia (Nordic Grid)</button>
+                <button class="region-pill" data-region="polar">✈️ Arctic Flight Corridors</button>
+                <button class="region-pill" data-region="equatorial">🌐 Equatorial GNSS Scintillation</button>
+                <button class="region-pill" data-region="saa">🛰️ South Atlantic Anomaly (SAA)</button>
+              </div>
+            </div>
+
+            <div class="legend-box">
+              <h4 class="subhead">3D Globe Visualization Legend</h4>
+              <div class="legend-items-grid">
+                <div class="legend-item">
+                  <div class="legend-color-dot" style="background: var(--color-power);"></div>
+                  <span><strong>Power Grids:</strong> High-voltage substations & telluric GIC lines</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-color-dot" style="background: var(--color-comms);"></div>
+                  <span><strong>Comms & GPS:</strong> Scintillation belts & HF absorption zones</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-color-dot" style="background: var(--color-sat);"></div>
+                  <span><strong>Satellites & Aviation:</strong> Polar flight routes & LEO orbits</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-color-dot" style="background: #10B981;"></div>
+                  <span><strong>Auroral Oval:</strong> Shimmering dynamic geomagnetic oval</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANE 4: SYSTEM INSPECTOR -->
+        <div id="pane-inspector" class="tab-pane">
+          <div class="inspector-pane-grid">
+            <!-- Left Column: Overview & Location -->
+            <div class="inspector-col-left">
+              <div class="inspector-badge-row">
+                <span id="inspector-type-badge" class="alert-category-tag">Category</span>
+                <span id="inspector-vuln-badge" class="impact-badge">Risk Level</span>
+              </div>
+              <h3 id="inspector-title">Select an alert or globe marker</h3>
+              <p id="inspector-region" class="inspector-coord-text">Coordinates: --</p>
+              <p id="inspector-desc" class="inspector-description-text">
+                Click on any pulsing beacon, flight arc, or transmission line on the 3D globe, or select an alert from the Live Alerts tab to inspect vulnerability diagnostics and emergency mitigation protocols.
+              </p>
+            </div>
+
+            <!-- Middle Column: Failure Modes -->
+            <div class="inspector-col-mid">
+              <h4 class="subhead">Vulnerability & Failure Modes</h4>
+              <ul id="inspector-risks" class="inspector-list">
+                <li>No system currently selected. Click a marker on the 3D globe to view engineering details.</li>
+              </ul>
+            </div>
+
+            <!-- Right Column: Mitigation Protocols -->
+            <div class="inspector-col-right">
+              <div class="subhead-with-action">
+                <h4 class="subhead">Actionable Mitigation Protocol</h4>
+                <button id="btn-dispatch-mitigation" class="mitigation-dispatch-btn" title="Send this operational mitigation protocol to your phone via ntfy.sh">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                  <span>Push to Phone</span>
+                </button>
+              </div>
+              <div class="mitigation-box">
+                <ul id="inspector-mitigations" class="inspector-list">
+                  <li>Standard space weather monitoring in progress.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 2. THE FLOATING BOTTOM DOCK (Always visible at the bottom) -->
+    <nav id="bottom-dock" class="bottom-dock glass-panel">
+      <button class="dock-tab active" data-tab="pane-impacts">
+        <span class="dock-tab-icon">⚡</span>
+        <span class="dock-tab-label">Sector Impacts</span>
+        <span class="dock-status-dot status-nominal"></span>
+      </button>
+
+      <button class="dock-tab" data-tab="pane-alerts">
+        <span class="dock-tab-icon">🚨</span>
+        <span class="dock-tab-label">Live Alerts</span>
+        <span id="dock-alert-badge" class="dock-badge">21</span>
+      </button>
+
+      <button class="dock-tab" data-tab="pane-regions">
+        <span class="dock-tab-icon">🌐</span>
+        <span class="dock-tab-label">Regions & Legend</span>
+      </button>
+
+      <button class="dock-tab" data-tab="pane-inspector">
+        <span class="dock-tab-icon">📋</span>
+        <span class="dock-tab-label">System Inspector</span>
+        <span id="dock-inspector-sub" class="dock-pill-sub">Ready</span>
+      </button>
+
+      <div class="dock-separator"></div>
+
+      <button id="btn-toggle-drawer" class="dock-toggle-btn" title="Toggle Slide-out Console">
+        <svg id="toggle-drawer-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- ==========================================
+       MOBILE NOTIFICATION SYSTEM MODAL (ntfy.sh)
+       ========================================== -->
+  <div id="modal-ntfy" class="ntfy-modal-backdrop" aria-hidden="true">
+    <div class="ntfy-modal-dialog glass-panel" role="dialog" aria-labelledby="ntfy-modal-title">
+      
+      <!-- Modal Header -->
+      <div class="ntfy-modal-header">
+        <div class="ntfy-header-brand">
+          <div class="ntfy-header-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+          </div>
+          <div>
+            <h3 id="ntfy-modal-title">Mobile Space Weather Alerts · ntfy.sh</h3>
+            <p class="ntfy-subtitle">Push solar flare & geomagnetic storm alerts directly to your phone lock screen</p>
+          </div>
+        </div>
+        <button id="btn-close-ntfy-modal" class="ntfy-close-btn" title="Close Modal">&times;</button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="ntfy-modal-body">
+        
+        <!-- STEP 1: Phone Pairing Section -->
+        <div class="ntfy-step-box">
+          <div class="ntfy-step-header">
+            <span class="ntfy-step-num">STEP 1</span>
+            <span class="ntfy-step-title">Pair Your Phone (Instant · No Login Required)</span>
+          </div>
+          
+          <div class="ntfy-pair-grid">
+            <!-- Left Info & Topic Controls -->
+            <div class="ntfy-pair-left">
+              <div class="ntfy-field-group">
+                <label for="ntfy-topic-input">Your Dedicated Notification Channel:</label>
+                <div class="ntfy-input-row">
+                  <span class="ntfy-topic-prefix">ntfy.sh/</span>
+                  <input type="text" id="ntfy-topic-input" class="ntfy-topic-input" spellcheck="false" autocomplete="off" placeholder="helioguard-storm-xxxx">
+                  <button id="btn-copy-topic" class="ntfy-btn-secondary" title="Copy topic name to clipboard">Copy</button>
+                  <button id="btn-regen-topic" class="ntfy-btn-secondary" title="Generate a new randomized channel">🎲 New</button>
+                </div>
+                <div class="ntfy-help-text">Type any unique topic name or keep the auto-generated one above.</div>
+              </div>
+
+              <!-- Two Options for Phone -->
+              <div class="ntfy-methods-list">
+                <div class="ntfy-method-item">
+                  <div class="ntfy-method-badge">Option A · Browser Push (No App Download)</div>
+                  <div class="ntfy-method-desc">
+                    Point your phone camera at the QR code (or click the button below) to open the channel in Safari (iOS) or Chrome (Android), then tap <strong>"Subscribe"</strong>!
+                  </div>
+                </div>
+                <div class="ntfy-method-item">
+                  <div class="ntfy-method-badge">Option B · Free ntfy Mobile App</div>
+                  <div class="ntfy-method-desc">
+                    Install the open-source <strong>ntfy</strong> app from Google Play or Apple App Store. Tap <strong>+</strong> and enter your channel name.
+                  </div>
+                </div>
+              </div>
+
+              <div class="ntfy-quick-actions-row">
+                <a id="link-open-ntfy-web" href="#" target="_blank" rel="noopener noreferrer" class="ntfy-btn-primary">
+                  <span>📱 Open Topic in Phone Browser</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </a>
+                <button id="btn-copy-url" class="ntfy-btn-secondary">📋 Copy Link</button>
+              </div>
+            </div>
+
+            <!-- Right QR Code Box -->
+            <div class="ntfy-pair-right">
+              <div class="ntfy-qr-card">
+                <div class="ntfy-qr-header">
+                  <span>📷 Scan with Phone Camera</span>
+                </div>
+                <div class="ntfy-qr-frame">
+                  <img id="ntfy-qr-image" src="" alt="Scan QR Code to Subscribe on Phone" class="ntfy-qr-img">
+                </div>
+                <div class="ntfy-qr-footer">
+                  <span id="ntfy-qr-topic-display">ntfy.sh/helioguard-storm</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2: Instant Test Trigger Section -->
+        <div class="ntfy-step-box">
+          <div class="ntfy-step-header">
+            <span class="ntfy-step-num">STEP 2</span>
+            <span class="ntfy-step-title">Test Your Phone Connection Right Now</span>
+          </div>
+          <div class="ntfy-test-action-row">
+            <button id="btn-send-test-push" class="ntfy-btn-test-action">
+              <span class="btn-icon">🚀</span>
+              <span class="btn-label">Send Test Alert to Phone</span>
+            </button>
+            <div id="ntfy-test-status" class="ntfy-test-feedback-box ready">
+              <span class="feedback-icon">📡</span>
+              <span class="feedback-text">Ready to test. Once your phone is open to the topic, click the button above to fire a live test push.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3: Automated Space Weather Push Preferences -->
+        <div class="ntfy-step-box">
+          <div class="ntfy-step-header">
+            <span class="ntfy-step-num">STEP 3</span>
+            <span class="ntfy-step-title">Automated Telemetry Dispatch Rules</span>
+          </div>
+          <div class="ntfy-settings-grid">
+            <label class="ntfy-toggle-label">
+              <input type="checkbox" id="ntfy-auto-toggle" checked>
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">
+                <strong>Auto-push critical NOAA bulletins to phone</strong>
+                <small>Automatically triggers mobile alerts when NOAA telemetry breaches your threshold</small>
+              </span>
+            </label>
+
+            <div class="ntfy-threshold-group">
+              <label for="ntfy-severity-select">Notification Severity Trigger:</label>
+              <select id="ntfy-severity-select" class="ntfy-select">
+                <option value="moderate" selected>Active & Above (Kp ≥ 4.0 / G1+ Storms)</option>
+                <option value="severe">Severe Storms Only (Kp ≥ 6.5 / G3+ Storms)</option>
+                <option value="critical">Extreme Superstorms (Kp ≥ 8.0 / G4-G5)</option>
+                <option value="all">All NOAA Space Weather Bulletins</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 4: Real-Time Dispatch Log -->
+        <div class="ntfy-step-box">
+          <div class="ntfy-step-header">
+            <span class="ntfy-step-num">LOG</span>
+            <span class="ntfy-step-title">Recent Mobile Dispatches (HTTP Push Log)</span>
+          </div>
+          <div id="ntfy-history-list" class="ntfy-history-container">
+            <div class="ntfy-history-empty">No alerts dispatched yet this session. Click "Send Test Alert" above to begin.</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="ntfy-modal-footer">
+        <span class="ntfy-footer-badge">
+          <span class="footer-dot"></span>
+          Direct client-side push · No servers, accounts, or API keys required
+        </span>
+        <button id="btn-done-ntfy-modal" class="ntfy-btn-done">Done / Close</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ==========================================
+       ALERT DETAILS MODAL / INSPECTION DIALOG
+       ========================================== -->
+  <div id="modal-alert-details" class="alert-details-backdrop" aria-hidden="true">
+    <div class="alert-details-dialog glass-panel" role="dialog" aria-labelledby="modal-alert-title">
+      <!-- Modal Header -->
+      <div class="alert-details-header">
+        <div class="alert-details-header-left">
+          <span id="modal-alert-icon" class="modal-alert-icon">⚡</span>
+          <div>
+            <div class="modal-badge-row">
+              <span id="modal-alert-category-tag" class="alert-category-tag">Geomagnetic Storm</span>
+              <span id="modal-alert-scale-badge" class="impact-badge status-critical">G3 Strong</span>
+              <span id="modal-alert-code-pill" class="alert-code-pill">NOAA SWPC</span>
+            </div>
+            <h3 id="modal-alert-title" class="modal-alert-title">Geomagnetic Storm Warning</h3>
+            <p id="modal-alert-authority" class="modal-alert-subtext">NOAA Space Weather Prediction Center (SWPC) · Boulder, CO</p>
+          </div>
+        </div>
+        <button id="btn-close-alert-modal" class="modal-close-btn" title="Close Details (Esc)">&times;</button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="alert-details-body">
+        <!-- Expected Hit Timing Banner -->
+        <div id="modal-alert-timing-banner" class="alert-timing-banner status-severe">
+          <div class="timing-badge-item">
+            <span class="timing-label">⏰ Expected Hit Window:</span>
+            <span id="modal-alert-hit-time" class="timing-val">Immediate / Active Storm</span>
+          </div>
+          <div class="timing-badge-item sub">
+            <span class="timing-label">📡 Official Bulletin Issued:</span>
+            <span id="modal-alert-issued-time" class="timing-val-sub">Today at 12:00 UTC</span>
+          </div>
+        </div>
+
+        <!-- Coordinates & Geographic Sector -->
+        <div class="alert-detail-section">
+          <div class="detail-section-title">
+            <span>🌐</span> Impacted Region & Geographic Coordinates
+          </div>
+          <p id="modal-alert-region" class="detail-section-content mono-text">Global Planetary Grid</p>
+        </div>
+
+        <!-- What is Happening (Plain Text) -->
+        <div class="alert-detail-section">
+          <div class="detail-section-title">
+            <span>📡</span> What Is Happening (Official Summary)
+          </div>
+          <p id="modal-alert-what-happening" class="detail-section-content">Active space weather disturbance monitored by NOAA sensors.</p>
+        </div>
+
+        <!-- Operational Impact & Infrastructure Vulnerability -->
+        <div class="alert-detail-section">
+          <div class="detail-section-title">
+            <span>⚡</span> Operational Impact & Infrastructure Vulnerability
+          </div>
+          <p id="modal-alert-what-expect" class="detail-section-content">Monitored fluctuations across planetary infrastructure systems.</p>
+        </div>
+
+        <!-- Actionable Engineering Mitigation Protocols -->
+        <div class="alert-detail-section">
+          <div class="detail-section-title">
+            <span>🛡️</span> Actionable Mitigation Protocol
+          </div>
+          <div class="mitigation-box">
+            <p id="modal-alert-mitigation" style="margin: 0;">Monitor NOAA SWPC real-time telemetry.</p>
+          </div>
+        </div>
+
+        <!-- Raw NOAA SWPC Bulletin (Collapsible) -->
+        <details class="alert-raw-details">
+          <summary class="raw-details-summary">View Raw NOAA SWPC Telemetry Bulletin</summary>
+          <pre id="modal-alert-raw-msg" class="raw-bulletin-pre"></pre>
+        </details>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="alert-details-footer">
+        <button id="btn-modal-push-phone" class="btn-card-push-phone modal-push-btn" title="Push this alert to your phone via ntfy.sh">
+          <span>📱 Push Alert to Phone</span>
+        </button>
+        <div style="display: flex; gap: 8px;">
+          <button id="btn-modal-view-inspector" class="btn-secondary-action" title="View in Bottom Dock Inspector">View in Inspector Pane</button>
+          <button id="btn-modal-done-close" class="ntfy-btn-done">Done / Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container for Screen Feedback -->
+  <div id="notification-toast-container" class="notification-toast-container"></div>
+
+  <!-- Main ES Module Entry Point -->
+  <script type="module" src="js/app.js?v=3.2"></script>
+</body>
+</html>
